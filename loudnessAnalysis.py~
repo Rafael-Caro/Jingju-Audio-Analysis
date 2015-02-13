@@ -101,7 +101,6 @@ def loudnessHarmonics (fileName, dumpFile = False):
         harmLoudness.append(LOUDNESS(yh_frame.tolist()))
 
     harmLoudness = np.array(harmLoudness)
-    harmLoudness = harmLoudness/np.max(harmLoudness)
 
     timeStamps = np.arange(harmLoudness.size) * H / float(fs)
     
@@ -164,24 +163,44 @@ def findSequence(seq, lst):
     
 #-------------------------------------------------------------------------------
 
-def plotSyllablesLoudness(indexes, syllablesValues, loudnessTable):
+def plotSyllablesLoudness(indexes, syllablesValues, loudnessData,
+                          normalization='None'):
+
+    # Normalizing loudness
+    timeStamps = loudnessData[:,0]
+    loudnessValues = loudnessData[:,1]
+    if normalization == 'None':
+        loudnessValues = loudnessValues
+        ymin = np.min(loudnessValues)
+        ymax = np.max(loudnessValues)
+    elif normalization == 'Mean':
+        loudnessValues = loudnessValues / np.mean(loudnessValues)
+        ymin = np.min(loudnessValues)
+        ymax = np.max(loudnessValues)
+    elif normalization == 'Max':
+        loudnessValues = loudnessValues / float(np.max(loudnessValues))
+        ymin = 0
+        ymax = 1
+    loudnessToPlot = np.column_stack((timeStamps, loudnessValues))
+        
+
     sections = []
     for i in range(len(indexes)):
         startTime = syllablesValues[indexes[i][1], 1]
         endTime = syllablesValues[indexes[i][1], 2]
-        indStart = np.argmin(abs(loudnessTable[:,0]-startTime))
-        indEnd = np.argmin(abs(loudnessTable[:,0]-endTime))
-        section = loudnessTable[indStart:indEnd,:]
+        indStart = np.argmin(abs(loudnessToPlot[:,0]-startTime))
+        indEnd = np.argmin(abs(loudnessToPlot[:,0]-endTime))
+        section = loudnessToPlot[indStart:indEnd,:]
         variance = np.var(section[:,1])
         sections.append((section, variance))
     
     fig = plt.figure()
     for i in range(len(sections)):
-        ax = fig.add_subplot(int(str(len(sections)) + '1' + str(i)))
+        ax = fig.add_subplot(int(str(len(sections)) + '1' + str(i+1)))
         ax.plot(sections[i][0][:,0], sections[i][0][:,1])
         ax.get_xaxis().get_major_formatter().set_useOffset(False)
         ax.set_title(indexes[i][0], family='Droid Sans Fallback')
-        ax.set_ylim((0, 1))
+        ax.set_ylim((ymin, ymax))
         xini = sections[i][0][0,0]
         xend = sections[i][0][-1,0]
         ax.set_xlim(xini, xend)
