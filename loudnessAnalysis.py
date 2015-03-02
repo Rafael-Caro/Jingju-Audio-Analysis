@@ -8,11 +8,18 @@ from scipy.signal import blackmanharris, triang
 from scipy.fftpack import ifft
 import codecs
 
-def syllablesLoudnessHarmonics (seq, csvFile, audioFile):
+def syllablesLoudnessHarmonics (seq, csvFile, loudnessFile, isAudio=False,
+                                normalization='None', linewidth=2,
+                                figsize=(5,7), fontsize=None):
     syllables, syllablesValues = csv2lists (csvFile)
-    loudnessTable = loudnessHarmonics (audioFile)
+    if isAudio:
+        loudnessData = loudnessHarmonics (audioFile)
+    else:
+        loudnessData = np.genfromtxt(loudnessFile, delimiter=',')
     indexes = findSequence (seq, syllables)
-    plotSyllablesLoudness (indexes, syllablesValues, loudnessTable)
+    plotSyllablesLoudness (indexes, syllablesValues, loudnessData,
+                           normalization=normalization, linewidth=linewidth,
+                           figsize=figsize, fontsize=fontsize)
 
 #-------------------------------------------------------------------------------
 
@@ -164,7 +171,8 @@ def findSequence(seq, lst):
 #-------------------------------------------------------------------------------
 
 def plotSyllablesLoudness(indexes, syllablesValues, loudnessData,
-                          normalization='None'):
+                          normalization='None', linewidth=2, figsize=(5,7),
+                          fontsize=None):
 
     # Normalizing loudness
     timeStamps = loudnessData[:,0]
@@ -173,15 +181,18 @@ def plotSyllablesLoudness(indexes, syllablesValues, loudnessData,
         loudnessValues = loudnessValues
         ymin = np.min(loudnessValues)
         ymax = np.max(loudnessValues)
+        ylabel = 'Loudness'
     elif normalization == 'Mean':
         indSil = np.where(loudnessValues<=0)
         loudnessValues = loudnessValues / np.mean(loudnessValues)
         ymin = np.min(loudnessValues)
         ymax = np.max(loudnessValues)
+        ylabel = 'Loudness (normalized to the mean)'
     elif normalization == 'Max':
         loudnessValues = loudnessValues / float(np.max(loudnessValues))
         ymin = 0
         ymax = 1
+        ylabel = 'Loudness (normalized to the maximum value)'
     loudnessToPlot = np.column_stack((timeStamps, loudnessValues))
         
 
@@ -194,20 +205,41 @@ def plotSyllablesLoudness(indexes, syllablesValues, loudnessData,
         section = loudnessToPlot[indStart:indEnd,:]
         variance = np.var(section[:,1])
         sections.append((section, variance))
-    
-    fig = plt.figure()
+
+## Made some changes for customization: set ymax=10, and specified yaxis ticks
+## positions (line 233)
+
+    ymax = 10
+    yticks_number = 2
+
+    fig = plt.figure(figsize=figsize)
+    ax0 = fig.add_subplot(111)
+    for i in ['top', 'bottom', 'left', 'right']:
+        ax0.spines[i].set_color('none')
+    ax0.tick_params(labelcolor='w', top='off', bottom='off', left='off',
+                   right='off')
+    ax0.set_xlabel('Time position in the aria (s)', fontsize=fontsize)
+    ax0.set_ylabel(ylabel, fontsize=fontsize)
     for i in range(len(sections)):
         ax = fig.add_subplot(int(str(len(sections)) + '1' + str(i+1)))
-        ax.plot(sections[i][0][:,0], sections[i][0][:,1])
+        ax.plot(sections[i][0][:,0], sections[i][0][:,1], linewidth=linewidth)
         ax.get_xaxis().get_major_formatter().set_useOffset(False)
-        ax.set_title(indexes[i][0], family='Droid Sans Fallback')
-        ax.set_ylim((ymin, ymax))
+        ax.set_ylim(ymin, ymax)
+        ax.yaxis.set_ticks(np.arange(ymin, ymax, yticks_number))
         xini = sections[i][0][0,0]
         xend = sections[i][0][-1,0]
         ax.set_xlim(xini, xend)
         text = 'Variance=' + str(round(sections[i][1], 3))
-        text_xpos = xini + ((xend - xini) * 0.05)
-        ax.text(text_xpos, .8, text)
+        text_xpos = xini + ((xend - xini) * 0.62)
+        text_ypos = ymin + ((ymax - ymin) * 0.7)
+        if fontsize != None:
+            ax.set_title(indexes[i][0], family='Droid Sans Fallback',
+                     fontsize=(fontsize*.6))
+            ax.text(text_xpos, text_ypos, text, fontsize=(fontsize*.75))
+        else:
+            ax.set_title(indexes[i][0], family='Droid Sans Fallback')
+            ax.text(text_xpos, text_ypos, text)
+    plt.tight_layout()
     plt.show()
     
     return sections
